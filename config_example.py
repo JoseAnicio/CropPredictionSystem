@@ -1,0 +1,10 @@
+PROJECT_ID = "your-project-id"
+DATASET = "crop_data"
+TABLE = "crop_recommendation"
+CREDENTIALS_PATH = "your-key.json"
+
+PG_HOST = "localhost"
+PG_PORT = "5432"
+PG_USER = "admin"
+PG_PASSWORD = "admin123"
+PG_DB = "crop_db"
