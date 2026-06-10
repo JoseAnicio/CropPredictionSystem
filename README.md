@@ -32,8 +32,6 @@ Both predictions run simultaneously and are displayed in a clean web interface.
 
 ---
 
----
-
 ## Architecture
 
 ```
