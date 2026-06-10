@@ -24,9 +24,13 @@ Both predictions run simultaneously and are displayed in a clean web interface.
 
 ## Screenshots
 
-![App Screenshot 1](images/app_image1.png)
-![App Screenshot 2](images/app_image2.png)
-![App Screenshot 3](images/app_image3.png)
+<p>
+  <img src="images/app_image1.png" width="32%"/>
+  <img src="images/app_image2.png" width="32%"/>
+  <img src="images/app_image3.png" width="32%"/>
+</p>
+
+---
 
 ---
 
