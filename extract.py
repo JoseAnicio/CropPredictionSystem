@@ -1,16 +1,30 @@
+import pandas as pd
 from google.cloud import bigquery
 from sqlalchemy import create_engine, text
-import pandas as pd
-from config import (PROJECT_ID, DATASET, TABLE, CREDENTIALS_PATH, PG_HOST, PG_PORT, PG_USER, PG_PASSWORD, PG_DB)
 
-def extract_from_bigquery():
+from config import (
+    CREDENTIALS_PATH,
+    DATASET,
+    PG_DB,
+    PG_HOST,
+    PG_PASSWORD,
+    PG_PORT,
+    PG_USER,
+    PROJECT_ID,
+    TABLE,
+)
+
+
+def extract_from_bigquery() -> pd.DataFrame:
     print("Connecting to BigQuery...")
-    client = bigquery.Client.from_service_account_json(CREDENTIALS_PATH, project=PROJECT_ID)
+    client = bigquery.Client.from_service_account_json(
+        CREDENTIALS_PATH, project=PROJECT_ID
+    )
 
     query = f"""
     SELECT N, P, K, temperature, humidity, ph, rainfall, label
     FROM `{PROJECT_ID}.{DATASET}.{TABLE}`
-""" 
+    """
 
     print("Extracting data from BigQuery...")
     df = client.query(query).to_dataframe(create_bqstorage_client=False)
@@ -18,17 +32,24 @@ def extract_from_bigquery():
 
     return df
 
-def load_to_postgresql(df):
+
+def load_to_postgresql(df: pd.DataFrame) -> None:
     print("Connecting to PostgreSQL...")
-    engine = create_engine(f'postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}')
+    engine = create_engine(
+        f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}"
+        f"@{PG_HOST}:{PG_PORT}/{PG_DB}"
+    )
 
     print("Loading data into PostgreSQL...")
     with engine.connect() as conn:
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS crop"))
         conn.commit()
 
-    df.to_sql('crop_data', engine, schema='crop', if_exists='replace', index=False)
+    df.to_sql(
+        "crop_data", engine, schema="crop", if_exists="replace", index=False
+    )
     print(f"{len(df)} rows loaded into PostgreSQL.")
+
 
 if __name__ == "__main__":
     df = extract_from_bigquery()

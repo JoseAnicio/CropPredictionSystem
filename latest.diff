@@ -1,0 +1,581 @@
+diff --git a/.example.env b/.example.env
+new file mode 100644
+index 0000000..7dbc8c3
+--- /dev/null
++++ b/.example.env
+@@ -0,0 +1,10 @@
++PROJECT_ID = "your-gcp-project-id"
++DATASET = "your_dataset_name"
++TABLE = "your_table_name"
++CREDENTIALS_PATH = "your-service-account-key.json"
++ 
++PG_HOST = "localhost"
++PG_PORT = "5432"
++PG_USER = "your_postgres_user"
++PG_PASSWORD = "your_postgres_password"
++PG_DB = "your_postgres_database"
+\ No newline at end of file
+diff --git a/.flake8 b/.flake8
+new file mode 100644
+index 0000000..7777d86
+--- /dev/null
++++ b/.flake8
+@@ -0,0 +1,2 @@
++[flake8]
++exclude = .venv,.git,__pycache__,models
+diff --git a/.gitignore b/.gitignore
+index 6bbb5f7..355e00c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,4 +1,5 @@
+-*.json          
+-config.py       
+-models/        
+-__pycache__/
+\ No newline at end of file
++*.json
++config.py
++models/
++__pycache__/
++.venv/
+\ No newline at end of file
+diff --git a/README.md b/README.md
+index 03386ec..adff798 100644
+--- a/README.md
++++ b/README.md
+@@ -34,15 +34,28 @@ Both predictions run simultaneously and are displayed in a clean web interface.
+ 
+ ## Architecture
+ 
+-```
+-Google BigQuery          PostgreSQL (Docker)       ML Models
+-─────────────────        ───────────────────       ─────────────────────
+-Raw CSV data      ──►    Structured storage  ──►   XGBoost Classifier
+-(crop_recommendation)    (crop.crop_data)          XGBoost Regressor
+-                                                          │
+-                                                          ▼
+-                                                   Gradio Interface
+-                                                   (localhost:7860)
++```mermaid
++flowchart LR
++    subgraph GCP["Google BigQuery"]
++        A[Raw CSV data<br/>crop_recommendation]
++    end
++
++    subgraph DB["PostgreSQL (Docker)"]
++        B[(Structured storage<br/>crop.crop_data)]
++    end
++
++    subgraph ML["ML Models"]
++        C[XGBoost Classifier]
++        D[XGBoost Regressor]
++    end
++
++    E[Gradio Interface<br/>localhost:7860]
++
++    A -->|ETL| B
++    B --> C
++    B --> D
++    C --> E
++    D --> E
+ ```
+ 
+ ---
+@@ -60,8 +73,6 @@ Raw CSV data      ──►    Structured storage  ──►   XGBoost Classifie
+ | Interface | Gradio | Interactive web UI |
+ | Containerization | Docker + docker-compose | Reproducible environment |
+ 
+-**Total infrastructure cost: $0**
+-
+ ---
+ 
+ ## Dataset
+@@ -98,7 +109,7 @@ Raw CSV data      ──►    Structured storage  ──►   XGBoost Classifie
+ ### Prerequisites
+ 
+ - Python 3.10+
+-- Docker Desktop
++- Docker
+ - Google Cloud account (free tier)
+ 
+ ### 1. Clone the repository
+@@ -124,22 +135,22 @@ pip install pandas sqlalchemy psycopg2-binary google-cloud-bigquery \
+ 
+ ### 4. Configure credentials
+ 
+-Edit `config.py`:
++Edit `.env`:
+ 
+ ```python
+-PROJECT_ID = "your-project-id"
+-DATASET = "crop_data"
+-TABLE = "crop_recommendation"
+-CREDENTIALS_PATH = "your-key.json"
+-
++PROJECT_ID = "your-gcp-project-id"
++DATASET = "your_dataset_name"
++TABLE = "your_table_name"
++CREDENTIALS_PATH = "your-service-account-key.json"
++ 
+ PG_HOST = "localhost"
+ PG_PORT = "5432"
+-PG_USER = "admin"
+-PG_PASSWORD = "admin123"
+-PG_DB = "crop_db"
++PG_USER = "your_postgres_user"
++PG_PASSWORD = "your_postgres_password"
++PG_DB = "your_postgres_database"
+ ```
+ 
+-> ⚠️ Add `config.py` and `*.json` to `.gitignore` before pushing.
++> ⚠️ Add `.env` and `*.json` to `.gitignore` before pushing.
+ 
+ ### 5. Start PostgreSQL
+ 
+diff --git a/compose.yaml b/compose.yaml
+new file mode 100644
+index 0000000..3dedeee
+--- /dev/null
++++ b/compose.yaml
+@@ -0,0 +1,14 @@
++services:
++  postgres:
++    image: postgres:18
++    container_name: crop_postgres
++    environment:
++      POSTGRES_USER: ${POSTGRES_USER}
++      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
++      POSTGRES_DB: ${POSTGRES_DB}
++    ports:
++      - 5432:5432/tcp
++    volumes:
++      - postgres_data:/var/lib/postgresql:rw
++volumes:
++  postgres_data:
+diff --git a/config.py b/config.py
+new file mode 100644
+index 0000000..20fb85c
+--- /dev/null
++++ b/config.py
+@@ -0,0 +1,13 @@
++import os
++from typing import Optional
++
++PROJECT_ID: Optional[str] = os.getenv("PROJECT_ID")
++DATASET: Optional[str] = os.getenv("DATASET")
++TABLE: Optional[str] = os.getenv("TABLE")
++CREDENTIALS_PATH: Optional[str] = os.getenv("CREDENTIALS_PATH")
++
++PG_HOST: Optional[str] = os.getenv("POSTGRES_HOST")
++PG_PORT: Optional[str] = os.getenv("POSTGRES_PORT")
++PG_USER: Optional[str] = os.getenv("POSTGRES_USER")
++PG_PASSWORD: Optional[str] = os.getenv("POSTGRES_PASSWORD")
++PG_DB: Optional[str] = os.getenv("POSTGRES_DB")
+diff --git a/config_example.py b/config_example.py
+deleted file mode 100644
+index 7a82dc9..0000000
+--- a/config_example.py
++++ /dev/null
+@@ -1,10 +0,0 @@
+-PROJECT_ID = "your-project-id"
+-DATASET = "crop_data"
+-TABLE = "crop_recommendation"
+-CREDENTIALS_PATH = "your-key.json"
+-
+-PG_HOST = "localhost"
+-PG_PORT = "5432"
+-PG_USER = "admin"
+-PG_PASSWORD = "admin123"
+-PG_DB = "crop_db"
+\ No newline at end of file
+diff --git a/docker-compose.yml b/docker-compose.yml
+deleted file mode 100644
+index f140b1f..0000000
+--- a/docker-compose.yml
++++ /dev/null
+@@ -1,15 +0,0 @@
+-services:
+-  postgres:
+-    image: postgres:17
+-    container_name: crop_postgres
+-    environment:
+-      POSTGRES_USER: admin
+-      POSTGRES_PASSWORD: admin123
+-      POSTGRES_DB: crop_db
+-    ports:
+-      - "5432:5432"
+-    volumes:
+-      - postgres_data:/var/lib/postgresql/data
+-
+-volumes:
+-  postgres_data:
+\ No newline at end of file
+diff --git a/extract.py b/extract.py
+index c493dbc..7e5c6a3 100644
+--- a/extract.py
++++ b/extract.py
+@@ -1,16 +1,30 @@
++import pandas as pd
+ from google.cloud import bigquery
+ from sqlalchemy import create_engine, text
+-import pandas as pd
+-from config import (PROJECT_ID, DATASET, TABLE, CREDENTIALS_PATH, PG_HOST, PG_PORT, PG_USER, PG_PASSWORD, PG_DB)
+ 
+-def extract_from_bigquery():
++from config import (
++    CREDENTIALS_PATH,
++    DATASET,
++    PG_DB,
++    PG_HOST,
++    PG_PASSWORD,
++    PG_PORT,
++    PG_USER,
++    PROJECT_ID,
++    TABLE,
++)
++
++
++def extract_from_bigquery() -> pd.DataFrame:
+     print("Connecting to BigQuery...")
+-    client = bigquery.Client.from_service_account_json(CREDENTIALS_PATH, project=PROJECT_ID)
++    client = bigquery.Client.from_service_account_json(
++        CREDENTIALS_PATH, project=PROJECT_ID
++    )
+ 
+     query = f"""
+     SELECT N, P, K, temperature, humidity, ph, rainfall, label
+     FROM `{PROJECT_ID}.{DATASET}.{TABLE}`
+-""" 
++    """
+ 
+     print("Extracting data from BigQuery...")
+     df = client.query(query).to_dataframe(create_bqstorage_client=False)
+@@ -18,19 +32,26 @@ def extract_from_bigquery():
+ 
+     return df
+ 
+-def load_to_postgresql(df):
++
++def load_to_postgresql(df: pd.DataFrame) -> None:
+     print("Connecting to PostgreSQL...")
+-    engine = create_engine(f'postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}')
++    engine = create_engine(
++        f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}"
++        f"@{PG_HOST}:{PG_PORT}/{PG_DB}"
++    )
+ 
+     print("Loading data into PostgreSQL...")
+     with engine.connect() as conn:
+         conn.execute(text("CREATE SCHEMA IF NOT EXISTS crop"))
+         conn.commit()
+ 
+-    df.to_sql('crop_data', engine, schema='crop', if_exists='replace', index=False)
++    df.to_sql(
++        "crop_data", engine, schema="crop", if_exists="replace", index=False
++    )
+     print(f"{len(df)} rows loaded into PostgreSQL.")
+ 
++
+ if __name__ == "__main__":
+     df = extract_from_bigquery()
+     load_to_postgresql(df)
+-    print("ETL process completed successfully.")
+\ No newline at end of file
++    print("ETL process completed successfully.")
+diff --git a/mypy.ini b/mypy.ini
+new file mode 100644
+index 0000000..78b2f57
+--- /dev/null
++++ b/mypy.ini
+@@ -0,0 +1,8 @@
++[mypy]
++python_version = 3.13
++ignore_missing_imports = True
++disallow_untyped_defs = True
++check_untyped_defs = True
++warn_unused_ignores = True
++warn_redundant_casts = True
++exclude = ^(\.venv|models)/
+diff --git a/requirements.txt b/requirements.txt
+new file mode 100644
+index 0000000..672a38f
+--- /dev/null
++++ b/requirements.txt
+@@ -0,0 +1,8 @@
++pandas==3.0.5
++numpy==2.5.3
++scikit-learn==1.9.0
++xgboost==3.4.1
++sqlalchemy==2.0.52
++psycopg2-binary==2.9.13
++google-cloud-bigquery==3.45.0
++gradio==6.26.0
+diff --git a/app/app.py b/src/app.py
+similarity index 78%
+rename from app/app.py
+rename to src/app.py
+index aabc523..281ba83 100644
+--- a/app/app.py
++++ b/src/app.py
+@@ -1,25 +1,38 @@
+-import gradio as gr
++import os
+ import pickle
++from typing import Tuple
++
++import gradio as gr
+ import numpy as np
+-import os
+ 
+ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ 
+ with open(os.path.join(BASE_DIR, "models", "classifier.pkl"), "rb") as f:
+     classifier, le = pickle.load(f)
+-    
++
+ with open(os.path.join(BASE_DIR, "models", "regressor.pkl"), "rb") as f:
+     regressor = pickle.load(f)
+ 
+-def predict(N, P, K, temperature, humidity, ph, rainfall):
++
++def predict(
++    N: float,
++    P: float,
++    K: float,
++    temperature: float,
++    humidity: float,
++    ph: float,
++    rainfall: float,
++) -> Tuple[str, str]:
+     features = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
+     crop_encoded = classifier.predict(features)[0]
+     crop_name = le.inverse_transform([crop_encoded])[0]
+     yield_pred = regressor.predict(features)[0]
+     return crop_name.upper(), f"{round(float(yield_pred), 2)} units"
+ 
++
+ css = """
+-@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Lato:wght@400;600;700&display=swap');
++@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@\
++400;700&family=Lato:wght@400;600;700&display=swap');
+ 
+ body, .gradio-container {
+     background-color: #ffffff !important;
+@@ -215,12 +228,15 @@ label {
+ }
+ """
+ 
+-with gr.Blocks(theme=gr.themes.Default(), css=css, title="Crop Prediction System") as app:
++with gr.Blocks(
++    theme=gr.themes.Default(), css=css, title="Crop Prediction System"
++) as app:
+ 
+     gr.HTML("""
+         <div id="header">
+             <h1>Crop Prediction System</h1>
+-            <p>Enter soil and climate conditions to get a crop recommendation and yield estimate</p>
++            <p>Enter soil and climate conditions to get a crop
++            recommendation and yield estimate</p>
+         </div>
+     """)
+ 
+@@ -232,31 +248,51 @@ with gr.Blocks(theme=gr.themes.Default(), css=css, title="Crop Prediction System
+             K = gr.Slider(5, 205, value=50, label="Potassium (K)")
+             ph = gr.Slider(3.5, 10.0, value=6.5, step=0.1, label="Soil pH")
+ 
+-            gr.HTML('<div class="section-title" style="margin-top:24px">Climate Conditions</div>')
+-            temperature = gr.Slider(8.0, 44.0, value=25.0, step=0.1, label="Temperature (°C)")
+-            humidity = gr.Slider(14.0, 100.0, value=70.0, step=0.1, label="Humidity (%)")
+-            rainfall = gr.Slider(20.0, 300.0, value=100.0, step=0.1, label="Rainfall (mm)")
++            gr.HTML(
++                '<div class="section-title" style="margin-top:24px">'
++                "Climate Conditions</div>"
++            )
++            temperature = gr.Slider(
++                8.0, 44.0, value=25.0, step=0.1, label="Temperature (°C)"
++            )
++            humidity = gr.Slider(
++                14.0, 100.0, value=70.0, step=0.1, label="Humidity (%)"
++            )
++            rainfall = gr.Slider(
++                20.0, 300.0, value=100.0, step=0.1, label="Rainfall (mm)"
++            )
+ 
+             btn = gr.Button("🔍  Predict", elem_id="predict-btn")
+ 
+         with gr.Column(scale=2):
+             gr.HTML('<div class="section-title">Results</div>')
+-            crop_output = gr.Textbox(label="Recommended Crop", elem_id="result-crop", interactive=False)
+-            yield_output = gr.Textbox(label="Estimated Yield", elem_id="result-yield", interactive=False)
++            crop_output = gr.Textbox(
++                label="Recommended Crop",
++                elem_id="result-crop",
++                interactive=False,
++            )
++            yield_output = gr.Textbox(
++                label="Estimated Yield",
++                elem_id="result-yield",
++                interactive=False,
++            )
+             gr.HTML("""
+                 <div class="info-box">
+                     <p>
+                         <strong>How it works</strong><br>
+                         The model analyzes soil nutrients (N, P, K), pH,
+-                        temperature, humidity and rainfall to recommend the best
+-                        crop and estimate productivity using XGBoost trained on
+-                        2,200 agricultural samples.
++                        temperature, humidity and rainfall to recommend
++                        the best crop and estimate productivity using
++                        XGBoost trained on 2,200 agricultural samples.
+                     </p>
+                 </div>
+             """)
+ 
+-    btn.click(fn=predict, inputs=[N, P, K, temperature, humidity, ph, rainfall],
+-              outputs=[crop_output, yield_output])
++    btn.click(  # type: ignore[attr-defined]
++        fn=predict,
++        inputs=[N, P, K, temperature, humidity, ph, rainfall],
++        outputs=[crop_output, yield_output],
++    )
+ 
+ if __name__ == "__main__":
+-    app.launch()
+\ No newline at end of file
++    app.launch()
+diff --git a/train.py b/train.py
+index d1b0f1c..939550b 100644
+--- a/train.py
++++ b/train.py
+@@ -1,37 +1,56 @@
+-import pandas as pd
++import os
++import pickle
++
+ import numpy as np
+-from sqlalchemy import create_engine
++import pandas as pd
++import xgboost as xgb
++from sklearn.metrics import classification_report, mean_squared_error
+ from sklearn.model_selection import train_test_split
+ from sklearn.preprocessing import LabelEncoder
+-from sklearn.metrics import classification_report, mean_squared_error
+-import xgboost as xgb
+-import pickle
+-import os
+-from config import PG_HOST, PG_PORT, PG_USER, PG_PASSWORD, PG_DB
++from sqlalchemy import create_engine
++
++from config import PG_DB, PG_HOST, PG_PASSWORD, PG_PORT, PG_USER
++
++FEATURE_COLUMNS = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
+ 
+-def load_data_from_postgres():
++
++def load_data_from_postgres() -> pd.DataFrame:
+     print("Loading data from PostgreSQL...")
+-    engine = create_engine(f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}")
++    engine = create_engine(
++        f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}"
++        f"@{PG_HOST}:{PG_PORT}/{PG_DB}"
++    )
+     df = pd.read_sql("SELECT * FROM crop.crop_data", engine)
+     print(f"{len(df)} rows loaded.")
+     return df
+ 
+-def train_classifier(df):
++
++def train_classifier(df: pd.DataFrame) -> None:
+     print("\nTraining classifier (XGBoost)...")
+-    X = df[['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']]
+-    y = df['label']
++    X = df[FEATURE_COLUMNS]
++    y = df["label"]
+ 
+     le = LabelEncoder()
+     y_encoded = le.fit_transform(y)
+ 
+-    X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
++    X_train, X_test, y_train, y_test = train_test_split(
++        X, y_encoded, test_size=0.2, random_state=42
++    )
+ 
+-    model = xgb.XGBClassifier(n_estimators = 100, max_depth= 6, random_state = 42, use_label_encoder=False, eval_metric='mlogloss')
++    model = xgb.XGBClassifier(
++        n_estimators=100,
++        max_depth=6,
++        random_state=42,
++        use_label_encoder=False,
++        eval_metric="mlogloss",
++    )
+     model.fit(X_train, y_train)
+ 
+     y_pred = model.predict(X_test)
+     print("\nClassification Report:")
+-    print(classification_report(y_test, y_pred, target_names=le.classes_))
++    print(
++        classification_report(y_test, y_pred, target_names=le.classes_)
++    )
+ 
+     os.makedirs("models", exist_ok=True)
+     with open("models/classifier.pkl", "wb") as f:
+@@ -40,26 +59,34 @@ def train_classifier(df):
+         pickle.dump(le, f)
+     print("Classifier saved.")
+ 
+-def train_regressor(df):
++
++def train_regressor(df: pd.DataFrame) -> None:
+     print("\nTraining regressor (XGBoost)...")
+-    
++
+     np.random.seed(42)
+ 
+     df["yield"] = (
+-        df["N"] * 0.3 +
+-        df["P"] * 0.2 +
+-        df["K"] * 0.2 +
+-        df["rainfall"] * 0.1 +
+-        df["temperature"] * 0.5 +
+-        np.random.normal(0, 5, len(df))
++        df["N"] * 0.3
++        + df["P"] * 0.2
++        + df["K"] * 0.2
++        + df["rainfall"] * 0.1
++        + df["temperature"] * 0.5
++        + np.random.normal(0, 5, len(df))
+     ).round(2)
+ 
+-    X = df[['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']]
+-    y = df['yield']
++    X = df[FEATURE_COLUMNS]
++    y = df["yield"]
+ 
+-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
++    X_train, X_test, y_train, y_test = train_test_split(
++        X, y, test_size=0.2, random_state=42
++    )
+ 
+-    model = xgb.XGBRegressor(n_estimators = 100, max_depth= 6, random_state = 42, eval_metric='mlogloss')
++    model = xgb.XGBRegressor(
++        n_estimators=100,
++        max_depth=6,
++        random_state=42,
++        eval_metric="mlogloss",
++    )
+     model.fit(X_train, y_train)
+ 
+     y_pred = model.predict(X_test)
+@@ -70,8 +97,9 @@ def train_regressor(df):
+         pickle.dump(model, f)
+     print("Regressor saved.")
+ 
++
+ if __name__ == "__main__":
+     df = load_data_from_postgres()
+     train_classifier(df)
+     train_regressor(df)
+-    print("\nTraining completed!")
+\ No newline at end of file
++    print("\nTraining completed!")

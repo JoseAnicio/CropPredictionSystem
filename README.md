@@ -34,15 +34,28 @@ Both predictions run simultaneously and are displayed in a clean web interface.
 
 ## Architecture
 
-```
-Google BigQuery          PostgreSQL (Docker)       ML Models
-─────────────────        ───────────────────       ─────────────────────
-Raw CSV data      ──►    Structured storage  ──►   XGBoost Classifier
-(crop_recommendation)    (crop.crop_data)          XGBoost Regressor
-                                                          │
-                                                          ▼
-                                                   Gradio Interface
-                                                   (localhost:7860)
+```mermaid
+flowchart LR
+    subgraph GCP["Google BigQuery"]
+        A[Raw CSV data<br/>crop_recommendation]
+    end
+
+    subgraph DB["PostgreSQL (Docker)"]
+        B[(Structured storage<br/>crop.crop_data)]
+    end
+
+    subgraph ML["ML Models"]
+        C[XGBoost Classifier]
+        D[XGBoost Regressor]
+    end
+
+    E[Gradio Interface<br/>localhost:7860]
+
+    A -->|ETL| B
+    B --> C
+    B --> D
+    C --> E
+    D --> E
 ```
 
 ---
@@ -59,8 +72,6 @@ Raw CSV data      ──►    Structured storage  ──►   XGBoost Classifie
 | Model persistence | Pickle | Save/load trained models |
 | Interface | Gradio | Interactive web UI |
 | Containerization | Docker + docker-compose | Reproducible environment |
-
-**Total infrastructure cost: $0**
 
 ---
 
@@ -98,7 +109,7 @@ Raw CSV data      ──►    Structured storage  ──►   XGBoost Classifie
 ### Prerequisites
 
 - Python 3.10+
-- Docker Desktop
+- Docker
 - Google Cloud account (free tier)
 
 ### 1. Clone the repository
@@ -124,22 +135,22 @@ pip install pandas sqlalchemy psycopg2-binary google-cloud-bigquery \
 
 ### 4. Configure credentials
 
-Edit `config.py`:
+Edit `.env`:
 
 ```python
-PROJECT_ID = "your-project-id"
-DATASET = "crop_data"
-TABLE = "crop_recommendation"
-CREDENTIALS_PATH = "your-key.json"
-
+PROJECT_ID = "your-gcp-project-id"
+DATASET = "your_dataset_name"
+TABLE = "your_table_name"
+CREDENTIALS_PATH = "your-service-account-key.json"
+ 
 PG_HOST = "localhost"
 PG_PORT = "5432"
-PG_USER = "admin"
-PG_PASSWORD = "admin123"
-PG_DB = "crop_db"
+PG_USER = "your_postgres_user"
+PG_PASSWORD = "your_postgres_password"
+PG_DB = "your_postgres_database"
 ```
 
-> ⚠️ Add `config.py` and `*.json` to `.gitignore` before pushing.
+> ⚠️ Add `.env` and `*.json` to `.gitignore` before pushing.
 
 ### 5. Start PostgreSQL
 

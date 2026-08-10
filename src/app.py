@@ -1,25 +1,38 @@
-import gradio as gr
-import pickle
-import numpy as np
 import os
+import pickle
+from typing import Tuple
+
+import gradio as gr
+import numpy as np
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 with open(os.path.join(BASE_DIR, "models", "classifier.pkl"), "rb") as f:
     classifier, le = pickle.load(f)
-    
+
 with open(os.path.join(BASE_DIR, "models", "regressor.pkl"), "rb") as f:
     regressor = pickle.load(f)
 
-def predict(N, P, K, temperature, humidity, ph, rainfall):
+
+def predict(
+    N: float,
+    P: float,
+    K: float,
+    temperature: float,
+    humidity: float,
+    ph: float,
+    rainfall: float,
+) -> Tuple[str, str]:
     features = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
     crop_encoded = classifier.predict(features)[0]
     crop_name = le.inverse_transform([crop_encoded])[0]
     yield_pred = regressor.predict(features)[0]
     return crop_name.upper(), f"{round(float(yield_pred), 2)} units"
 
+
 css = """
-@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Lato:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@\
+400;700&family=Lato:wght@400;600;700&display=swap');
 
 body, .gradio-container {
     background-color: #ffffff !important;
@@ -215,12 +228,15 @@ label {
 }
 """
 
-with gr.Blocks(theme=gr.themes.Default(), css=css, title="Crop Prediction System") as app:
+with gr.Blocks(
+    theme=gr.themes.Default(), css=css, title="Crop Prediction System"
+) as app:
 
     gr.HTML("""
         <div id="header">
             <h1>Crop Prediction System</h1>
-            <p>Enter soil and climate conditions to get a crop recommendation and yield estimate</p>
+            <p>Enter soil and climate conditions to get a crop
+            recommendation and yield estimate</p>
         </div>
     """)
 
@@ -232,31 +248,51 @@ with gr.Blocks(theme=gr.themes.Default(), css=css, title="Crop Prediction System
             K = gr.Slider(5, 205, value=50, label="Potassium (K)")
             ph = gr.Slider(3.5, 10.0, value=6.5, step=0.1, label="Soil pH")
 
-            gr.HTML('<div class="section-title" style="margin-top:24px">Climate Conditions</div>')
-            temperature = gr.Slider(8.0, 44.0, value=25.0, step=0.1, label="Temperature (°C)")
-            humidity = gr.Slider(14.0, 100.0, value=70.0, step=0.1, label="Humidity (%)")
-            rainfall = gr.Slider(20.0, 300.0, value=100.0, step=0.1, label="Rainfall (mm)")
+            gr.HTML(
+                '<div class="section-title" style="margin-top:24px">'
+                "Climate Conditions</div>"
+            )
+            temperature = gr.Slider(
+                8.0, 44.0, value=25.0, step=0.1, label="Temperature (°C)"
+            )
+            humidity = gr.Slider(
+                14.0, 100.0, value=70.0, step=0.1, label="Humidity (%)"
+            )
+            rainfall = gr.Slider(
+                20.0, 300.0, value=100.0, step=0.1, label="Rainfall (mm)"
+            )
 
             btn = gr.Button("🔍  Predict", elem_id="predict-btn")
 
         with gr.Column(scale=2):
             gr.HTML('<div class="section-title">Results</div>')
-            crop_output = gr.Textbox(label="Recommended Crop", elem_id="result-crop", interactive=False)
-            yield_output = gr.Textbox(label="Estimated Yield", elem_id="result-yield", interactive=False)
+            crop_output = gr.Textbox(
+                label="Recommended Crop",
+                elem_id="result-crop",
+                interactive=False,
+            )
+            yield_output = gr.Textbox(
+                label="Estimated Yield",
+                elem_id="result-yield",
+                interactive=False,
+            )
             gr.HTML("""
                 <div class="info-box">
                     <p>
                         <strong>How it works</strong><br>
                         The model analyzes soil nutrients (N, P, K), pH,
-                        temperature, humidity and rainfall to recommend the best
-                        crop and estimate productivity using XGBoost trained on
-                        2,200 agricultural samples.
+                        temperature, humidity and rainfall to recommend
+                        the best crop and estimate productivity using
+                        XGBoost trained on 2,200 agricultural samples.
                     </p>
                 </div>
             """)
 
-    btn.click(fn=predict, inputs=[N, P, K, temperature, humidity, ph, rainfall],
-              outputs=[crop_output, yield_output])
+    btn.click(  # type: ignore[attr-defined]
+        fn=predict,
+        inputs=[N, P, K, temperature, humidity, ph, rainfall],
+        outputs=[crop_output, yield_output],
+    )
 
 if __name__ == "__main__":
     app.launch()
